@@ -9,13 +9,14 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/CarGod/GitPeek/releases/latest"><img src="https://img.shields.io/github/v/release/CarGod/GitPeek?color=6FCF97&label=download" alt="download"/></a>
   <img src="https://img.shields.io/badge/platform-macOS%2013%2B-1b1b1f" alt="platform"/>
   <img src="https://img.shields.io/badge/Swift-5.9-F05138" alt="swift"/>
   <img src="https://img.shields.io/badge/license-MIT-9E74D4" alt="license"/>
 </p>
 
 <p align="center">
-  <a href="#english">English</a> · <a href="#中文">中文</a>
+  <b><a href="https://github.com/CarGod/GitPeek/releases/latest">⬇️ Download the signed & notarized .dmg</a></b> · <a href="#english">English</a> · <a href="#中文">中文</a>
 </p>
 
 ---
@@ -45,11 +46,15 @@ GitPeek is a floating, always-in-sync git panel for people who live in the termi
 - `git` on your `PATH`
 - Xcode / the Swift toolchain (to build)
 
-### Build & install
+### Download (recommended)
+
+Grab the latest **`.dmg`** from the [**Releases**](https://github.com/CarGod/GitPeek/releases/latest) page, open it, and drag **GitPeek** into Applications. It is signed with a Developer ID and **notarized by Apple**, so there is no Gatekeeper warning.
+
+### Build from source
 
 ```bash
-git clone <your-repo-url> gitpeek
-cd gitpeek
+git clone https://github.com/CarGod/GitPeek.git
+cd GitPeek
 
 # (recommended) create a stable local signing identity so the Accessibility
 # grant survives rebuilds — you may see one keychain prompt:
@@ -131,11 +136,15 @@ GitPeek 是给「泡在终端里」的人做的悬浮 git 面板。它吸附在 
 - `PATH` 里有 `git`
 - Xcode / Swift 工具链（用于构建）
 
-### 构建与安装
+### 下载安装（推荐）
+
+到 [**Releases**](https://github.com/CarGod/GitPeek/releases/latest) 页下载最新 **`.dmg`**，打开、把 **GitPeek** 拖进「应用程序」即可。已用 Developer ID 签名 + **Apple 公证**，无 Gatekeeper 警告。
+
+### 从源码构建
 
 ```bash
-git clone <你的仓库地址> gitpeek
-cd gitpeek
+git clone https://github.com/CarGod/GitPeek.git
+cd GitPeek
 
 # （推荐）先建一个固定的本地签名身份，让「辅助功能」授权不会因重建失效
 # 过程可能会弹一次钥匙串确认：

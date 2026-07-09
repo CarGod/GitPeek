@@ -56,6 +56,30 @@ echo "==> staple 装订公证票据"
 xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 
+echo "✓ dmg 已签名 + 公证 + staple: $DMG"
+
+# ── 发布到 GitHub Release（幂等）───────────────────────────────
+# 版本号取自 Info.plist 的 CFBundleShortVersionString；改版本 = 改那里再重跑本脚本。
+TAG="v$VERSION"
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  echo "==> 发布 GitHub Release $TAG"
+  # 确保 tag 存在并推送
+  git rev-parse "$TAG" >/dev/null 2>&1 || git tag -a "$TAG" -m "GitPeek $VERSION"
+  git push origin "$TAG" 2>/dev/null || true
+  if gh release view "$TAG" >/dev/null 2>&1; then
+    gh release upload "$TAG" "$DMG" --clobber
+    echo "    已更新已存在 Release 的 dmg 附件"
+  else
+    gh release create "$TAG" "$DMG" \
+      --title "GitPeek $VERSION" \
+      --notes "GitPeek $VERSION — 已签名 + Apple 公证的 .dmg，下载双击拖进 Applications 即可（无 Gatekeeper 警告）。详见 README。" \
+      --verify-tag
+    echo "    已创建 Release"
+  fi
+  echo -n "    "; gh release view "$TAG" --json url --jq .url
+else
+  echo "（未检测到已登录的 gh，跳过自动发布；dmg 在 $DMG，可手动 gh release create $TAG \"$DMG\"）"
+fi
+
 echo
-echo "✓ 完成: $DMG"
-echo "  别人下载这个 dmg，双击打开、把 GitPeek 拖进 Applications 即可，无 Gatekeeper 警告。"
+echo "✓ 全部完成。别人从 Releases 页下载 dmg，双击拖进 Applications 即可，无 Gatekeeper 警告。"

@@ -46,10 +46,11 @@ final class GitService: ObservableObject {
                 // result == nil 表示瞬时读取失败 → 保持现状（不闪空、不重置滚动）
                 if let ns = result {
                     if ns != self.state {
-                        Log.write("state REASSIGN commits=\(ns.commits.count) changes=\(ns.changes.count)")
+                        Log.write("state REASSIGN commits=\(ns.commits.count) changes=\(ns.changes.count) repos=\(ns.availableRepos.count) parent=\((ns.reposParent as NSString?)?.lastPathComponent ?? "-")")
                         self.state = ns
                     }
-                    self.syncWatcher(root: ns.root)
+                    // 单仓库监听仓库根；多仓库监听父目录（新仓库/改动即时触发，不只靠 1s 轮询）
+                    self.syncWatcher(root: ns.root ?? ns.reposParent)
                 }
                 self.refreshing = false
                 self.didRefresh?()

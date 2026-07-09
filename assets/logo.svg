@@ -1,0 +1,43 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GitPeek logo">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#27272c"/>
+      <stop offset="1" stop-color="#141417"/>
+    </linearGradient>
+    <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ECA23C"/>
+      <stop offset="0.46" stop-color="#ECA23C"/>
+      <stop offset="0.56" stop-color="#9E74D4"/>
+      <stop offset="1" stop-color="#9E74D4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- app tile -->
+  <rect x="16" y="16" width="480" height="480" rx="110" fill="url(#tile)"/>
+  <rect x="16.75" y="16.75" width="478.5" height="478.5" rx="109.25" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="1.5"/>
+
+  <!-- terminal prompt  >▊ -->
+  <path d="M104 190 L170 256 L104 322" fill="none" stroke="#6FCF97" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="196" y="234" width="46" height="46" rx="12" fill="#6FCF97"/>
+
+  <!-- faint dock divider -->
+  <line x1="266" y1="120" x2="266" y2="392" stroke="#ffffff" stroke-opacity="0.06" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- docked git panel -->
+  <rect x="292" y="92" width="164" height="328" rx="30" fill="#2c2c33"/>
+  <rect x="292.75" y="92.75" width="162.5" height="326.5" rx="29.25" fill="none" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1.5"/>
+
+  <!-- git graph: rail + commit bars + nodes -->
+  <line x1="336" y1="150" x2="336" y2="360" stroke="url(#rail)" stroke-width="10" stroke-linecap="round"/>
+
+  <rect x="366" y="146" width="66" height="16" rx="8" fill="#ECA23C" fill-opacity="0.9"/>
+  <rect x="366" y="247" width="58" height="16" rx="8" fill="#61616d"/>
+  <rect x="366" y="348" width="64" height="16" rx="8" fill="#61616d"/>
+
+  <!-- unpushed (amber) node with halo -->
+  <circle cx="336" cy="154" r="34" fill="#ECA23C" fill-opacity="0.22"/>
+  <circle cx="336" cy="154" r="22" fill="#ECA23C"/>
+  <!-- pushed (purple) nodes -->
+  <circle cx="336" cy="255" r="18" fill="#9E74D4"/>
+  <circle cx="336" cy="356" r="18" fill="#9E74D4"/>
+</svg>

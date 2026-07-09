@@ -26,6 +26,7 @@ mkdir -p "$DEST/Contents/MacOS"
 mkdir -p "$DEST/Contents/Resources"
 cp "$BIN" "$DEST/Contents/MacOS/$APP_NAME"
 cp Info.plist "$DEST/Contents/Info.plist"
+[ -f assets/AppIcon.icns ] && cp assets/AppIcon.icns "$DEST/Contents/Resources/AppIcon.icns"
 
 # 优先用固定的自签名身份（指纹稳定，辅助功能授权不会因重建失效）；没有就退回 ad-hoc
 IDENTITY="GitPeek Local"

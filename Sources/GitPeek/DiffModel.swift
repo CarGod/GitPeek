@@ -2,6 +2,7 @@ import SwiftUI
 
 // 要展示 diff 的目标：工作区文件（commit==nil）或某提交里的文件
 struct DiffTarget: Equatable {
+    var root: String          // 文件所属仓库根（多仓库手风琴里每个文件的仓库不同）
     var path: String
     var commit: String?       // nil = 工作区改动；否则是提交哈希
     var staged: Bool
@@ -14,15 +15,15 @@ struct DiffTarget: Equatable {
         return d.isEmpty ? "" : d
     }
 
-    init(path: String, commit: String?, staged: Bool, letter: String, oldPath: String? = nil) {
-        self.path = path; self.commit = commit; self.staged = staged
+    init(root: String, path: String, commit: String?, staged: Bool, letter: String, oldPath: String? = nil) {
+        self.root = root; self.path = path; self.commit = commit; self.staged = staged
         self.letter = letter; self.oldPath = oldPath
     }
-    init(change c: ChangeEntry) {
-        self.init(path: c.path, commit: nil, staged: c.staged, letter: c.letter, oldPath: c.oldPath)
+    init(root: String, change c: ChangeEntry) {
+        self.init(root: root, path: c.path, commit: nil, staged: c.staged, letter: c.letter, oldPath: c.oldPath)
     }
-    init(commit h: String, file f: CommitFileChange) {
-        self.init(path: f.path, commit: h, staged: false, letter: f.letter, oldPath: f.oldPath)
+    init(root: String, commit h: String, file f: CommitFileChange) {
+        self.init(root: root, path: f.path, commit: h, staged: false, letter: f.letter, oldPath: f.oldPath)
     }
 }
 
@@ -70,7 +71,8 @@ enum DiffBuilder {
     static let maxBodyLines = 3000
     static let wholeFileContext = "100000"   // 足够大的上下文 → 带出整个文件
 
-    static func build(target t: DiffTarget, root: String) -> DiffState {
+    static func build(target t: DiffTarget) -> DiffState {
+        let root = t.root
         // (1) 冲突/未合并文件：git 会输出 combined `diff --cc`，两列解析器渲染不了 → 占位
         if t.commit == nil && t.letter == "!" { return .conflict(t) }
 

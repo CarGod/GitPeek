@@ -35,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeDiff()
 
         // 文件内容变了但 porcelain 状态没变时，也让已打开的 diff 面板实时更新
-        git.didRefresh = { [weak coordinator] in coordinator?.reloadDiffIfNeeded() }
+        git.didRefresh = { [weak coordinator] in coordinator?.onRefresh() }
 
         // iTerm2 激活时立刻刷新目录
         NSWorkspace.shared.notificationCenter.addObserver(

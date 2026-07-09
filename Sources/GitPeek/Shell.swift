@@ -36,6 +36,21 @@ enum Shell {
         run(gitPath, ["-C", root, "-c", "core.quotepath=false"] + args)
     }
 
+    // 跑 git 并捕获 stderr（用于需要错误信息的写操作，如 checkout）。返回 (是否成功, stderr)
+    static func gitResult(_ args: [String], root: String) -> (ok: Bool, err: String) {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: gitPath)
+        p.arguments = ["-C", root, "-c", "core.quotepath=false"] + args
+        let errPipe = Pipe()
+        p.standardOutput = FileHandle.nullDevice     // stdout 丢弃
+        p.standardError = errPipe                     // stderr 排空读取，无死锁
+        do { try p.run() } catch { return (false, "无法运行 git") }
+        let data = errPipe.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        let err = (String(data: data, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (p.terminationStatus == 0, err)
+    }
+
     // 专给 `git diff --no-index` 用：它「文件不同」时退出码为 1，不能当失败；
     // 且不裁剪任何空白（diff 里的空白有意义）。
     static func gitDiff(_ args: [String], root: String) -> String? {

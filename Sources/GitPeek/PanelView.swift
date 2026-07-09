@@ -35,7 +35,9 @@ struct PanelView: View {
         VStack(spacing: 0) {
             header
             Rectangle().fill(Palette.border).frame(height: 1)
-            if git.state.isRepo {
+            if git.state.isMulti {
+                multiRepoList
+            } else if git.state.isRepo {
                 content
             } else {
                 emptyState
@@ -56,19 +58,36 @@ struct PanelView: View {
                 minW: 240, maxW: 900)
                 .frame(width: 8)
         }
+        .overlay(alignment: .bottom) {
+            if let toast = coordinator.toast {
+                Text(toast)
+                    .font(.system(size: 11)).foregroundColor(.white)
+                    .lineLimit(2).multilineTextAlignment(.center)
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(red: 0.55, green: 0.20, blue: 0.20).opacity(0.96)))
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: coordinator.toast)
     }
 
     // MARK: - 顶部分支条
 
     private var header: some View {
         HStack(spacing: 7) {
-            Image(systemName: "arrow.triangle.branch")
+            Image(systemName: git.state.isMulti ? "folder.fill" : "arrow.triangle.branch")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(Palette.dot)
-            Text(git.state.isRepo ? git.state.branch : "GitPeek")
+            Text(headerTitle)
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundColor(Palette.fileName)
                 .lineLimit(1)
+            if git.state.isMulti {
+                Text("\(git.state.availableRepos.count) 个仓库")
+                    .font(.system(size: 10)).foregroundColor(Palette.dirPath)
+            }
             if git.state.isRepo && (git.state.ahead > 0 || git.state.behind > 0) {
                 HStack(spacing: 7) {
                     if git.state.behind > 0 {
@@ -97,6 +116,27 @@ struct PanelView: View {
             Image(systemName: symbol).font(.system(size: 9, weight: .bold))
             Text("\(n)").font(.system(size: 10.5, weight: .medium))
         }
+    }
+
+    private var headerTitle: String {
+        if git.state.isRepo { return git.state.branch }
+        if git.state.isMulti {
+            return git.state.reposParent.map { ($0 as NSString).lastPathComponent } ?? "GitPeek"
+        }
+        return "GitPeek"
+    }
+
+    // MARK: - 多仓库手风琴（当前目录不是仓库、但子目录里有仓库）
+
+    private var multiRepoList: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(git.state.availableRepos) { repo in
+                    RepoAccordionRow(repo: repo, coordinator: coordinator)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - 主体
@@ -139,7 +179,7 @@ struct PanelView: View {
                         .foregroundColor(Palette.dirPath)
                         .padding(.horizontal, 12).padding(.vertical, 9)
                 } else {
-                    ForEach(git.state.changes) { ChangeRow(entry: $0, coordinator: coordinator) }
+                    ForEach(git.state.changes) { ChangeRow(entry: $0, root: git.state.root ?? "", coordinator: coordinator) }
                 }
             }
         }
@@ -150,7 +190,7 @@ struct PanelView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(git.state.commits.enumerated()), id: \.element.hash) { _, c in
-                    CommitRow(commit: c, coordinator: coordinator)
+                    CommitRow(commit: c, root: git.state.root ?? "", coordinator: coordinator)
                 }
             }
         }
@@ -212,14 +252,110 @@ struct PanelView: View {
     }
 }
 
+// MARK: - 手风琴行：一个子仓库（点击展开显示它的改动文件）
+
+private struct RepoAccordionRow: View {
+    let repo: ChildRepo
+    @ObservedObject var coordinator: PanelCoordinator
+    @State private var hovering = false
+
+    private var path: String { repo.path }
+    private var expanded: Bool { coordinator.isRepoExpanded(path) }
+    private var changes: [ChangeEntry]? { coordinator.changesFor(path) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(Palette.dirPath).frame(width: 10)
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 11)).foregroundColor(Palette.dot)
+                Text(repo.name)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundColor(Palette.fileName).lineLimit(1)
+                Spacer(minLength: 6)
+                if !repo.branch.isEmpty { branchMenu }
+                if let ch = changes, !ch.isEmpty {
+                    Text("\(ch.count)")
+                        .font(.system(size: 10, weight: .bold)).foregroundColor(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(Capsule().fill(Palette.badgeBlue))
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(hovering ? Palette.hover : Palette.sectionBar)
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .onTapGesture { withAnimation(.easeInOut(duration: 0.12)) { coordinator.toggleRepo(path) } }
+
+            if expanded {
+                if let ch = changes {
+                    if ch.isEmpty {
+                        Text("没有改动")
+                            .font(.system(size: 11.5)).foregroundColor(Palette.dirPath)
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                    } else {
+                        ForEach(ch) { ChangeRow(entry: $0, root: path, coordinator: coordinator) }
+                    }
+                } else if coordinator.isLoadingRepo(path) {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text("载入中…").font(.system(size: 10.5)).foregroundColor(Palette.dirPath)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                }
+            }
+            Rectangle().fill(Palette.border).frame(height: 1)
+        }
+    }
+
+    // 分支下拉：显示当前分支，点开切换
+    private var branchMenu: some View {
+        Menu {
+            if let branches = coordinator.branchesFor(path) {
+                // 加载完成：空仓库(无分支)则至少显示当前分支
+                let all = branches.isEmpty ? [repo.branch] : branches
+                ForEach(all, id: \.self) { b in
+                    Button {
+                        guard b != repo.branch else { return }
+                        coordinator.checkoutBranch(path, b)
+                    } label: {
+                        if b == repo.branch { Label(b, systemImage: "checkmark") } else { Text(b) }
+                    }
+                }
+            } else {
+                Text("加载中…")   // repoBranches[path] == nil，还没加载完
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.system(size: 8, weight: .semibold)).foregroundColor(Palette.dot)
+                Text(repo.branch)
+                    .font(.system(size: 10)).foregroundColor(Palette.sectionText).lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7, weight: .semibold)).foregroundColor(Palette.dirPath)
+            }
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Capsule().fill(Color.white.opacity(0.06)))
+            .contentShape(Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onAppear { coordinator.loadBranchesIfNeeded(path) }
+    }
+}
+
 // MARK: - 单行：改动文件
 
 private struct ChangeRow: View {
     let entry: ChangeEntry
+    let root: String
     @ObservedObject var coordinator: PanelCoordinator
     @State private var hovering = false
 
-    private var target: DiffTarget { DiffTarget(change: entry) }
+    private var target: DiffTarget { DiffTarget(root: root, change: entry) }
     private var selected: Bool { coordinator.isSelected(target) }
 
     var body: some View {
@@ -258,6 +394,7 @@ private struct ChangeRow: View {
 
 private struct CommitRow: View {
     let commit: CommitEntry
+    let root: String
     @ObservedObject var coordinator: PanelCoordinator
     @State private var headerHover = false
 
@@ -321,7 +458,7 @@ private struct CommitRow: View {
                         .foregroundColor(Palette.dirPath)
                         .padding(.vertical, 4).padding(.leading, 2)
                 } else {
-                    ForEach(fs) { CommitFileRow(file: $0, hash: commit.hash, coordinator: coordinator) }
+                    ForEach(fs) { CommitFileRow(file: $0, hash: commit.hash, root: root, coordinator: coordinator) }
                 }
             } else if coordinator.isLoadingFiles(commit.hash) {
                 HStack(spacing: 6) {
@@ -340,10 +477,11 @@ private struct CommitRow: View {
 private struct CommitFileRow: View {
     let file: CommitFileChange
     let hash: String
+    let root: String
     @ObservedObject var coordinator: PanelCoordinator
     @State private var hovering = false
 
-    private var target: DiffTarget { DiffTarget(commit: hash, file: file) }
+    private var target: DiffTarget { DiffTarget(root: root, commit: hash, file: file) }
     private var selected: Bool { coordinator.isSelected(target) }
 
     var body: some View {

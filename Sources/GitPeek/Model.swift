@@ -68,6 +68,18 @@ struct RepoState: Equatable {
     var behind: Int = 0
     var changes: [ChangeEntry] = []
     var commits: [CommitEntry] = []
+    // 多仓库模式：当前目录不是仓库、但直接子目录里有仓库时，列出它们（自然序、确定性 → 不破坏防滚动重置）
+    var availableRepos: [ChildRepo] = [] // depth-1 子仓库；非空=多仓库模式
+    var reposParent: String? = nil       // availableRepos 所属父目录（cwd）
 
     var isRepo: Bool { root != nil }
+    var isMulti: Bool { !availableRepos.isEmpty }
+}
+
+// 多仓库列表里的一个子仓库
+struct ChildRepo: Identifiable, Equatable {
+    var id: String { path }
+    var path: String
+    var branch: String       // 当前分支（读 .git/HEAD 得到；worktree/detached 可能为空或短 sha）
+    var name: String { (path as NSString).lastPathComponent }
 }

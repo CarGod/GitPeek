@@ -32,4 +32,18 @@ final class Settings {
         get { (d.object(forKey: "diffPanelWidth") as? Double) ?? 460 }
         set { d.set(min(max(newValue, 300), 1100), forKey: "diffPanelWidth") }
     }
+
+    // 多仓库手风琴：按父目录记住展开了哪些子仓库（下次回到同目录/重启后恢复）
+    private let expandedKey = "expandedReposByParent"
+
+    func expandedRepos(forParent parent: String) -> Set<String> {
+        let dict = d.dictionary(forKey: expandedKey) as? [String: [String]]
+        return Set(dict?[parent] ?? [])
+    }
+
+    func setExpandedRepos(_ repos: [String], forParent parent: String) {
+        var dict = (d.dictionary(forKey: expandedKey) as? [String: [String]]) ?? [:]
+        if repos.isEmpty { dict[parent] = nil } else { dict[parent] = repos.sorted() }
+        d.set(dict, forKey: expandedKey)
+    }
 }

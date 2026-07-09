@@ -79,34 +79,112 @@ final class GitService: ObservableObject {
         guard let cwd = ITerm.currentSessionPath() else {
             return nil   // 取不到目录 → 保持现状
         }
-        guard let root = Shell.git(["rev-parse", "--show-toplevel"], root: cwd), !root.isEmpty else {
-            // rev-parse 失败：若仍在原仓库内，判为瞬时失败，保持现状；否则确实不是仓库
-            if let prevRoot = previous.root, cwd == prevRoot || cwd.hasPrefix(prevRoot + "/") {
-                return nil
-            }
-            return RepoState()
+        // 已在多仓库模式、cwd 没变、且 cwd 自身没新出现 .git → 跳过必失败的 rev-parse，直接重扫
+        if previous.reposParent == cwd, !previous.availableRepos.isEmpty,
+           !FileManager.default.fileExists(atPath: (cwd as NSString).appendingPathComponent(".git")) {
+            guard let children = childRepos(of: cwd) else { return nil }
+            guard !children.isEmpty else { return RepoState() }
+            var s = RepoState(); s.availableRepos = children; s.reposParent = cwd
+            return s
         }
+        // A 本身在某仓库里 → 单仓库模式（父仓库优先）
+        if let root = Shell.git(["rev-parse", "--show-toplevel"], root: cwd), !root.isEmpty {
+            return buildRepo(root: root)
+        }
+        // rev-parse 失败：单仓库模式下仍在原仓库内 → 判为瞬时失败，保持现状
+        if let prevRoot = previous.root, previous.availableRepos.isEmpty,
+           cwd == prevRoot || cwd.hasPrefix(prevRoot + "/") {
+            return nil
+        }
+
+        // 不是仓库 → 扫 depth-1 子仓库；多仓库模式只带列表，各仓库的改动由手风琴按需加载
+        guard let children = childRepos(of: cwd) else { return nil }   // 读目录失败 → 保持现状
+        guard !children.isEmpty else { return RepoState() }            // 读到但无子仓库 → 空状态
+        var s = RepoState()
+        s.availableRepos = children
+        s.reposParent = cwd
+        return s                                                       // root 保持 nil
+    }
+
+    // 只取某仓库的改动文件列表（手风琴展开时用）
+    static func changeEntries(root: String) -> [ChangeEntry]? {
+        guard let status = Shell.git(["status", "--porcelain=v2", "--branch"], root: root) else { return nil }
+        var s = RepoState()
+        parseStatus(status, into: &s)
+        return s.changes
+    }
+
+    // 该仓库的本地分支列表（点分支下拉时懒加载）
+    static func branchList(root: String) -> [String]? {
+        guard let out = Shell.git(["branch", "--format=%(refname:short)"], root: root) else { return nil }
+        return out.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    // 切换分支（git 会安全拒绝会丢数据的切换）；成功返回 nil，失败返回错误信息
+    static func checkout(root: String, branch: String) -> String? {
+        let r = Shell.gitResult(["checkout", branch], root: root)
+        if r.ok { return nil }
+        // git 的失败信息通常多行，取第一行有内容的当提示
+        let firstLine = r.err.split(separator: "\n").first.map(String.init) ?? ""
+        return firstLine.isEmpty ? "切换失败" : firstLine
+    }
+
+    // 读 .git/HEAD 得到当前分支（廉价文件读，不起 git）；worktree(.git 文件)/读失败返回 ""
+    private static func currentBranch(root: String) -> String {
+        let gitPath = (root as NSString).appendingPathComponent(".git")
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: gitPath, isDirectory: &isDir), isDir.boolValue else { return "" }
+        let headPath = (gitPath as NSString).appendingPathComponent("HEAD")
+        guard let head = try? String(contentsOfFile: headPath, encoding: .utf8) else { return "" }
+        let t = head.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.hasPrefix("ref: refs/heads/") { return String(t.dropFirst("ref: refs/heads/".count)) }
+        return t.count >= 7 ? String(t.prefix(7)) : t   // detached → 短 sha
+    }
+
+    // 组装单个仓库的 status + log（单仓库和子仓库共用）
+    private static func buildRepo(root: String) -> RepoState? {
         var s = RepoState()
         s.root = root
-
         // status 成功必然包含分支头；返回 nil 视为瞬时失败 → 保持现状（不闪空）
         guard let status = Shell.git(["status", "--porcelain=v2", "--branch"], root: root) else {
             return nil
         }
         parseStatus(status, into: &s)
 
-        // 未推送提交集合（上游..HEAD）
         var unpushed = Set<String>()
         if !s.upstream.isEmpty,
            let rev = Shell.git(["rev-list", "\(s.upstream)..HEAD"], root: root) {
             for h in rev.split(separator: "\n") { unpushed.insert(String(h)) }
         }
-
         if let log = Shell.git(
             ["log", "-n", "80", "--pretty=format:%H%x1f%h%x1f%D%x1f%s"], root: root) {
             s.commits = parseLog(log, unpushed: unpushed)
         }
         return s
+    }
+
+    // 扫描 dir 的「直接子目录」里哪些是 git 仓库（只一层，不递归）。
+    // 纯文件系统 stat + 读 HEAD，不为每个子目录起 git。读目录失败返回 nil（瞬时，保持现状）。
+    private static func childRepos(of dir: String) -> [ChildRepo]? {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: dir) else { return nil }
+        let sorted = names.sorted()   // 廉价确定性排序（保证同一目录 → 同一数组）
+        var repos: [ChildRepo] = []
+        var scanned = 0
+        for name in sorted {
+            scanned += 1
+            if scanned > 2000 { break }          // 迭代封顶：超大目录也有界
+            if name == ".git" { continue }        // 跳过父目录自身的 .git（.dotfiles 等点目录仓库仍保留）
+            let child = (dir as NSString).appendingPathComponent(name)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: child, isDirectory: &isDir), isDir.boolValue else { continue }
+            // .git 目录(常规) 或 .git 文件(worktree/submodule) 都算
+            if fm.fileExists(atPath: (child as NSString).appendingPathComponent(".git")) {
+                repos.append(ChildRepo(path: child, branch: currentBranch(root: child)))
+                if repos.count >= 64 { break }    // 结果封顶
+            }
+        }
+        return repos
     }
 
     private static func parseStatus(_ text: String, into s: inout RepoState) {

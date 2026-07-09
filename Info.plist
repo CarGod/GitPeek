@@ -2,29 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>GitPeek</string>
-    <key>CFBundleDisplayName</key>
-    <string>GitPeek</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.liufei.gitpeek</string>
-    <key>CFBundleExecutable</key>
-    <string>GitPeek</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSAppleEventsUsageDescription</key>
-    <string>GitPeek 需要读取 iTerm2 当前窗口所在目录，用来显示对应仓库的 Git 状态。</string>
-    <key>NSHumanReadableCopyright</key>
-    <string>GitPeek</string>
+	<key>CFBundleDisplayName</key>
+	<string>GitPeek</string>
+	<key>CFBundleExecutable</key>
+	<string>GitPeek</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.liufei.gitpeek</string>
+	<key>CFBundleName</key>
+	<string>GitPeek</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.2.0</string>
+	<key>CFBundleVersion</key>
+	<string>2</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>GitPeek 需要读取 iTerm2 当前窗口所在目录，用来显示对应仓库的 Git 状态。</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>GitPeek</string>
 </dict>
 </plist>

@@ -33,6 +33,13 @@ final class Settings {
         set { d.set(min(max(newValue, 300), 1100), forKey: "diffPanelWidth") }
     }
 
+    // Fable 周用量进度条的分母：官方没有 Fable 单独额度窗口，故用一个可调「周预算」当满格基准。
+    // 默认 40M（work-tokens）。用户知道自己真实上限时可改成真实值。
+    var fableWeeklyBudget: Double {
+        get { (d.object(forKey: "fableWeeklyBudget") as? Double) ?? 40_000_000 }
+        set { d.set(max(1_000_000, newValue), forKey: "fableWeeklyBudget") }
+    }
+
     // 多仓库手风琴：按父目录记住展开了哪些子仓库（下次回到同目录/重启后恢复）
     private let expandedKey = "expandedReposByParent"
 

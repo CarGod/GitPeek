@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var diffPanel: NSPanel!
     private let git = GitService()
     private lazy var coordinator = PanelCoordinator(git: git)
+    private let usage = UsageService()
     private var follower: WindowFollower!
     private var cwdTimer: Timer?
     private var axTimer: Timer?
@@ -49,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         ensureAccessibility()
         git.refresh()
+        usage.start()
     }
 
     // MARK: - 状态栏
@@ -103,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.acceptsMouseMovedEvents = true
-        let host = NSHostingView(rootView: PanelView(git: git, coordinator: coordinator))
+        let host = NSHostingView(rootView: PanelView(git: git, coordinator: coordinator, usage: usage))
         host.frame = panel.contentView!.bounds
         host.autoresizingMask = [.width, .height]
         panel.contentView?.addSubview(host)
@@ -247,6 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
            app.bundleIdentifier == WindowFollower.itermBundleID {
             git.refresh()
+            usage.refresh()
         }
     }
 

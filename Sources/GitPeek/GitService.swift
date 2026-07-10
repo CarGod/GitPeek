@@ -142,6 +142,64 @@ final class GitService: ObservableObject {
         return t.count >= 7 ? String(t.prefix(7)) : t   // detached → 短 sha
     }
 
+    // 子仓库「本地已提交未推送」计数。守住「列目录不为每仓起 git」的约定：
+    // 先纯文件系统读本地分支 tip 与上游 tip 的 sha —— 相等(已全部推送，最常见)直接 0，不起 git；
+    // 仅当两者不同才 git rev-list 精确计数，并按 (localSHA, upstreamSHA) 缓存 → commit/push 后自动失效。
+    private struct AheadEntry { var local: String; var upstream: String; var ahead: Int }
+    private static var aheadCache: [String: AheadEntry] = [:]
+
+    private static func aheadCount(root: String, branch: String) -> Int {
+        guard !branch.isEmpty, let upRef = upstreamRef(root: root, branch: branch),
+              let local = resolveRef(root: root, ref: "refs/heads/\(branch)"),
+              let up = resolveRef(root: root, ref: upRef) else { return 0 }
+        if local == up { aheadCache[root] = nil; return 0 }          // 全部已推送（最常见）→ 免 git
+        if let c = aheadCache[root], c.local == local, c.upstream == up { return c.ahead }
+        // tip 不同：精确数一次
+        let n = Shell.git(["rev-list", "--count", "\(upRef)..HEAD"], root: root)
+            .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) } ?? 0
+        aheadCache[root] = AheadEntry(local: local, upstream: up, ahead: n)
+        return n
+    }
+
+    // 从 .git/config 解析 branch 的上游 ref。无上游(未 push/未跟踪) → nil。
+    private static func upstreamRef(root: String, branch: String) -> String? {
+        let cfg = (root as NSString).appendingPathComponent(".git/config")
+        guard let text = try? String(contentsOfFile: cfg, encoding: .utf8) else { return nil }
+        var inSection = false, remote: String?, merge: String?
+        for raw in text.split(separator: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") { inSection = (line == "[branch \"\(branch)\"]"); continue }
+            guard inSection, let eq = line.firstIndex(of: "=") else { continue }
+            let key = line[..<eq].trimmingCharacters(in: .whitespaces)
+            let val = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+            if key == "remote" { remote = val } else if key == "merge" { merge = val }
+        }
+        guard let r = remote, let m = merge else { return nil }
+        let short = m.hasPrefix("refs/heads/") ? String(m.dropFirst("refs/heads/".count)) : m
+        return r == "." ? m : "refs/remotes/\(r)/\(short)"   // remote "." = 本地跟踪
+    }
+
+    // 解析一个 ref 到 sha（loose 文件优先，符号引用跟随一次；否则查 packed-refs）。取不到 → nil。
+    private static func resolveRef(root: String, ref: String) -> String? {
+        let git = (root as NSString).appendingPathComponent(".git")
+        let loose = (git as NSString).appendingPathComponent(ref)
+        if let s = try? String(contentsOfFile: loose, encoding: .utf8) {
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.hasPrefix("ref: ") { return resolveRef(root: root, ref: String(t.dropFirst(5))) }
+            if !t.isEmpty { return t }
+        }
+        if let packed = try? String(contentsOfFile: (git as NSString).appendingPathComponent("packed-refs"), encoding: .utf8) {
+            for raw in packed.split(separator: "\n") {
+                if raw.hasPrefix("#") || raw.hasPrefix("^") { continue }
+                let parts = raw.split(separator: " ", maxSplits: 1)
+                if parts.count == 2, parts[1].trimmingCharacters(in: .whitespaces) == ref {
+                    return String(parts[0])
+                }
+            }
+        }
+        return nil
+    }
+
     // 组装单个仓库的 status + log（单仓库和子仓库共用）
     private static func buildRepo(root: String) -> RepoState? {
         var s = RepoState()
@@ -181,7 +239,8 @@ final class GitService: ObservableObject {
             guard fm.fileExists(atPath: child, isDirectory: &isDir), isDir.boolValue else { continue }
             // .git 目录(常规) 或 .git 文件(worktree/submodule) 都算
             if fm.fileExists(atPath: (child as NSString).appendingPathComponent(".git")) {
-                repos.append(ChildRepo(path: child, branch: currentBranch(root: child)))
+                let br = currentBranch(root: child)
+                repos.append(ChildRepo(path: child, branch: br, ahead: aheadCount(root: child, branch: br)))
                 if repos.count >= 64 { break }    // 结果封顶
             }
         }

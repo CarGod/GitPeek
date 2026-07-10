@@ -29,19 +29,24 @@ enum Palette {
 struct PanelView: View {
     @ObservedObject var git: GitService
     @ObservedObject var coordinator: PanelCoordinator
+    @ObservedObject var usage: UsageService
     @State private var ratio: CGFloat = CGFloat(Settings.shared.splitRatio)
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Rectangle().fill(Palette.border).frame(height: 1)
-            if git.state.isMulti {
-                multiRepoList
-            } else if git.state.isRepo {
-                content
-            } else {
-                emptyState
+            Group {
+                if git.state.isMulti {
+                    multiRepoList
+                } else if git.state.isRepo {
+                    content
+                } else {
+                    emptyState
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            UsageBar(usage: usage)   // 常驻底部额度条
         }
         .background(Palette.bg)
         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -276,6 +281,7 @@ private struct RepoAccordionRow: View {
                     .foregroundColor(Palette.fileName).lineLimit(1)
                 Spacer(minLength: 6)
                 if !repo.branch.isEmpty { branchMenu }
+                if repo.ahead > 0 { aheadBadge }
                 if let ch = changes, !ch.isEmpty {
                     Text("\(ch.count)")
                         .font(.system(size: 10, weight: .bold)).foregroundColor(.white)
@@ -308,6 +314,18 @@ private struct RepoAccordionRow: View {
             }
             Rectangle().fill(Palette.border).frame(height: 1)
         }
+    }
+
+    // 本地未推送提交数徽标（琥珀，呼应图里「amber = 本地未推送」）；仅 ahead>0 时出现。
+    private var aheadBadge: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "arrow.up").font(.system(size: 8, weight: .bold))
+            Text("\(repo.ahead)").font(.system(size: 10, weight: .semibold))
+        }
+        .foregroundColor(Palette.localTag)
+        .padding(.horizontal, 5).padding(.vertical, 1)
+        .background(Capsule().fill(Palette.localTag.opacity(0.16)))
+        .help("\(repo.ahead) 个本地提交未推送")
     }
 
     // 分支下拉：显示当前分支，点开切换

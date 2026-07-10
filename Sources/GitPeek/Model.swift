@@ -81,5 +81,6 @@ struct ChildRepo: Identifiable, Equatable {
     var id: String { path }
     var path: String
     var branch: String       // 当前分支（读 .git/HEAD 得到；worktree/detached 可能为空或短 sha）
+    var ahead: Int = 0       // 本地已提交但未推送到上游的提交数（无上游/detached = 0）
     var name: String { (path as NSString).lastPathComponent }
 }
